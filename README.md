@@ -4,6 +4,8 @@
 
 Comme de nombreux usagers, que ce soit en Île-de-France ou ailleurs en France, j'utilise quotidiennement les transports en commun. Et, comme beaucoup, je fais face régulièrement à des perturbations sur mes trajets. Ce projet a pour but de quantifier et d'analyser ces perturbations, puis de publier ces informations sur des plateformes comme Instagram.
 
+L'idée à la suite de cela serait d'élaborer deux modèles prédictifs des retards. Un modèle de classification qui aura pour but pour un trajet donné d'informer l'utilisateur s'il y a de forte chance que ce trajet soit perturbé (pourrait permettre de choisir entre deux trajets plus ou moins équivalent en temps). Le deuxième modèle sera un modèle de classification et aura pour but de quantifier le retard pour un trajet donné.
+
 ## Collecte des données
 
 La collecte des données s'appuie sur deux principales sources via des API :
