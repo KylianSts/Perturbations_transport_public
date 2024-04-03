@@ -2,7 +2,9 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-from Functions import to_sql_database
+from Functions import fetch_page, to_sql_database
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 
 def fetch_data_disruptions_tgv_ter(today, yesterday):
@@ -133,25 +135,14 @@ def fetch_data_disruptions_tgv_ter(today, yesterday):
 
 
 def fetch_data_vehicle_journeys_tgv_ter(today, yesterday):
-    """
-    Collecte les données des voyages des trains TGV et TER entre deux dates et les enregistre dans une table SQL.
-
-    Paramètres :
-        today (str) : La date actuelle au format 'YYYYMMDDTHHMMSS'.
-        yesterday (str) : La date de la veille au format 'YYYYMMDDTHHMMSS'.
-
-    """
-
-    # URL de base pour l'API des trajets de véhicules (trains) de la SNCF.
     url_vehicle_tgv_ter = 'https://api.sncf.com/v1/coverage/sncf/vehicle_journeys/'
-
-    # Paramètres de la requête API, incluant la période de recherche et l'exclusion de certains modes de transport.
+    headers = {'Authorization': os.getenv('api_key_sncf')}
     params = {
-        'since': yesterday,  # Début de la période de recherche
-        'until': today,  # Fin de la période de recherche
-        'start_page': 0,  # Page de départ pour la pagination
+        'since': yesterday,
+        'until': today,
+        'start_page': 0,
         'depth': 3,
-        'forbidden_id[]': [  # Modes de transport exclus de la recherche
+        'forbidden_id[]': [
             'physical_mode:Bus',
             'physical_mode:Coach',
             'physical_mode:RapidTransit',
@@ -160,63 +151,57 @@ def fetch_data_vehicle_journeys_tgv_ter(today, yesterday):
         ],
     }
 
-    # Headers de la requête, incluant l'autorisation via une clé API stockée dans les variables d'environnement.
-    headers = {'Authorization': os.getenv('api_key_sncf')}
+    # Première requête pour déterminer le nombre total de pages
+    initial_response = fetch_page(url_vehicle_tgv_ter, headers, params)
+    if initial_response:
+        total_result = initial_response['pagination']['total_result']
+        items_per_page = initial_response['pagination']['items_per_page']
+        nb_page = (total_result // items_per_page) + (1 if total_result % items_per_page else 0)
 
-    # Première requête à l'API pour récupérer les données.
-    response = requests.get(url_vehicle_tgv_ter, headers=headers, params=params)
-    data_vehicle_tgv_ter = response.json()
+        vehicle_tgv_ter = []
+        futures = []
 
-    # Initialisation d'une liste pour stocker les informations sur les trajets des véhicules.
-    vehicle_tgv_ter = []
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            for page in range(1, nb_page + 1):
+                params_copy = params.copy()
+                params_copy['start_page'] = page
+                futures.append(executor.submit(fetch_page, url_vehicle_tgv_ter, headers, params_copy))
 
-    # Calcul du nombre total de pages à parcourir, basé sur les informations de pagination de la réponse.
-    nb_page = int(
-        data_vehicle_tgv_ter['pagination']['total_result'] / data_vehicle_tgv_ter['pagination']['items_per_page']) + 1
+            for future in as_completed(futures):
+                data_vehicle_tgv_ter = future.result()
+                if data_vehicle_tgv_ter and 'vehicle_journeys' in data_vehicle_tgv_ter:
+                    for vehicle_journey in data_vehicle_tgv_ter['vehicle_journeys']:
+                        vehicle_info = extract_vehicle_journey_info(vehicle_journey, yesterday)
+                        if vehicle_info:
+                            vehicle_tgv_ter.append(vehicle_info)
 
-    # Boucle sur toutes les pages de résultats.
-    for page in range(1, nb_page + 1):
-        # Vérification si la requête a été réussie.
-        if response.status_code == 200:
-            # Chargement des données de la page actuelle.
-            data_vehicle_tgv_ter = response.json()
+        df_vehicle_tgv_ter = pd.DataFrame(vehicle_tgv_ter)
+        to_sql_database(df_vehicle_tgv_ter, 'SNCF_TGV_TER', 'vehicle_journeys_tgv_ter')
+    else:
+        print("Erreur lors de la récupération des informations initiales.")
 
-            # Extraction et traitement des données de chaque trajet de véhicule.
-            for vehicle_journey in data_vehicle_tgv_ter['vehicle_journeys']:
-                vehicle_id = vehicle_journey['id']
-                route_id = vehicle_journey['journey_pattern']['route']['id']
-                time_begin = vehicle_journey['stop_times'][0]['departure_time']
-                time_end = vehicle_journey['stop_times'][len(vehicle_journey['stop_times']) - 1]['departure_time']
-                train_type = 'Train grande vitesse' if 'LongDistanceTrain' in vehicle_id else 'TER / Intercités'
 
-                # Gestion des identifiants de perturbation, s'il y en a.
-                id_disruption = vehicle_journey['disruptions'][0]['id'] if len(
-                    vehicle_journey['disruptions']) >= 1 else None
+def extract_vehicle_journey_info(vehicle_journey, yesterday):
+    try:
+        vehicle_id = vehicle_journey['id']
+        route_id = vehicle_journey['journey_pattern']['route']['id']
+        time_begin = vehicle_journey['stop_times'][0]['departure_time']
+        time_end = vehicle_journey['stop_times'][-1]['departure_time']
+        train_type = 'Train grande vitesse' if 'LongDistanceTrain' in vehicle_id else 'TER / Intercités'
+        id_disruption = vehicle_journey['disruptions'][0]['id'] if vehicle_journey['disruptions'] else None
 
-                # Création d'un dictionnaire avec les informations du trajet et ajout à la liste.
-                vehicle_tgv_ter_info = {
-                    'vehicle_id': vehicle_id,
-                    'route_id': route_id,
-                    'time_begin': time_begin,
-                    'time_end': time_end,
-                    'train_type': train_type,
-                    'id_disruption': id_disruption,
-                    'data_date': yesterday[0:8]
-                }
-                vehicle_tgv_ter.append(vehicle_tgv_ter_info)
-        else:
-            # Affichage d'un message d'erreur en cas de problème avec la requête.
-            print(f"Erreur lors de la récupération des données: {response.status_code}")
-
-        # Mise à jour des paramètres pour la pagination, passage à la page suivante.
-        params['start_page'] = page
-        response = requests.get(url_vehicle_tgv_ter, headers=headers, params=params)
-
-    # Conversion de la liste des informations des trajets en DataFrame pour un traitement ultérieur.
-    df_vehicle_tgv_ter = pd.DataFrame(vehicle_tgv_ter)
-
-    to_sql_database(df_vehicle_tgv_ter, 'SNCF_TGV_TER', 'vehicle_journeys_tgv_ter')
-
+        return {
+            'vehicle_id': vehicle_id,
+            'route_id': route_id,
+            'time_begin': time_begin,
+            'time_end': time_end,
+            'train_type': train_type,
+            'id_disruption': id_disruption,
+            'data_date': yesterday[:8]
+        }
+    except Exception as e:
+        print(f"Erreur lors de l'extraction des données d'un voyage: {e}")
+        return None
 
 
 if __name__ == "__main__":
