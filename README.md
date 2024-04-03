@@ -2,7 +2,7 @@
 
 # DESCRIPTION DU PROJET
 
-Comme de nombreux usagers, que ce soit en Île-de-France ou ailleurs en France, j'utilise quotidiennement les transports en commun. Et, comme beaucoup, je fais face régulièrement à des perturbations sur mes trajets. Ce projet a pour but d'un côté de quantifier et d'analyser ces perturbations, puis de publier ces informations sur des plateformes comme Instagram.D'un autre côté ce projet a pour but de prédire les retards éventuels.
+Comme de nombreux usagers, que ce soit en Île-de-France ou ailleurs en France, j'utilise quotidiennement les transports en commun. Et, comme beaucoup, je fais face régulièrement à des perturbations sur mes trajets. Ce projet a pour but d'un côté de quantifier et d'analyser ces perturbations, puis de publier ces informations.D'un autre côté ce projet a pour but de prédire les retards éventuels.
 
 ## Collecte des données
 
