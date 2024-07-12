@@ -1,4 +1,4 @@
-![](https://youtu.be/vNuyLwfcpvA)
+[![Démonstration de la vidéo](https://img.youtube.com/vi/vNuyLwfcpvA/0.jpg)](https://youtu.be/vNuyLwfcpvA)
 
 # DESCRIPTION DU PROJET
 
