@@ -15,6 +15,7 @@ Ces sources offrent un accès à de nombreuses données sur les réseaux de tran
 ## Fonctionnalités
 
 Ce tableau de bord répond efficacement à une variété de questions liées à la gestion des perturbations sur les réseaux TGV et TER, accessible en seulement quelques clics. Voici quelques exemples :
+
   •	Quel type de perturbation cause le plus de retards en moyenne ?
   •	Combien de TER ont été en circulation et combien ont été perturbés entre 19h et 21h lors de la première semaine de juillet ?
   •	Quel est le pourcentage de perturbations en heures de pointe et en heures creuses pour le mois de juin ?
